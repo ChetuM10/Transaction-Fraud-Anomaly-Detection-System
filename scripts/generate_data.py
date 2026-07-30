@@ -123,7 +123,7 @@ def generate_transactions(users, num_transactions, fraud_ratio):
                     10.0,
                     np.random.normal(
                         user["avg_transaction_amount"],
-                        user["avg+transaction_amount"] * 0.2,
+                        user["avg_transaction_amount"] * 0.2,
                     ),
                 ),
                 2,
@@ -165,7 +165,7 @@ def generate_transactions(users, num_transactions, fraud_ratio):
 
                 # Foreceful timestamp hour to early morning(2 - 4). Doesn't occur in actual real life systems
                 # this is just to show a few examples about unsual timing transactions.
-                tc_time = tx_time.replace(
+                tx_time = tx_time.replace(
                     hour=random.randint(2, 4), minute=random.randint(0, 59)
                 )
 
@@ -179,7 +179,7 @@ def generate_transactions(users, num_transactions, fraud_ratio):
                 "id": tx_id,
                 "user_id": user["id"],
                 "amount": amount,
-                "merchant_category": mechant,
+                "merchant_category": merchant,
                 "timestamp": tx_time,
                 "device_id": device_id,
                 "ip_address": ip_address,
@@ -188,3 +188,44 @@ def generate_transactions(users, num_transactions, fraud_ratio):
             }
         )
     return transactions
+
+
+def insert_transactions(transactions):
+    # this inserts transactions that are generated into PostgreSQL
+    conn = get_connection()
+    cursor = conn.cursor()
+    for t in transactions:
+        cursor.execute(
+            """
+            INSERT INTO transactions (
+            id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (
+                t["id"],
+                t["user_id"],
+                t["amount"],
+                t["merchant_category"],
+                t["timestamp"],
+                t["device_id"],
+                t["ip_address"],
+                t["billing_geo"],
+                t["shipping_geo"],
+            ),
+        )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Inserted {len(transactions)} transactions.")
+
+
+if __name__ == "__main__":
+    print("Starting data generation...")
+    users = generate_users(NUM_USERS)
+    insert_users(users)
+
+    transactions = generate_transactions(users, NUM_TRANSACTIONS, FRAUD_RATIO)
+    insert_transactions(transactions)
+    print("Data generation complete!")
