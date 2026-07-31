@@ -3,7 +3,7 @@
 CREATE TABLE if NOT EXISTS users (
     id VARCHAR(50) PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    avg_transaction NUMERIC(12, 2) DEFAULT (0.00),
+    avg_transaction_amount NUMERIC(12, 2) DEFAULT (0.00),
     home_geo VARCHAR(50),
     known_devices TEXT [] DEFAULT '{}'
 );
