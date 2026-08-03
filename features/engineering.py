@@ -65,3 +65,13 @@ def compute_time_anomaly(tx_hour, past_hours):
         hour_deviation = round(float(abs(tx_hour - mean_hour) / std_hour), 4)
 
     return is_odd_hour, hour_deviation
+
+
+# ---------------------Feature:5 - Category Diff-----------------------------#
+def compute_category_diversity(recent_categories):
+    """
+    How many diff merchant categories did this user hit in the last hour?
+    """
+    if not recent_categories:
+        return 0
+    return len(set(recent_categories))
