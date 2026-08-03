@@ -48,7 +48,7 @@ def compute_geo_device_mismatch(device_id, shipping_geo, known_devices, home_geo
     return is_new_device, is_geo_mismatch
 
 
-# ---------------------Featrue:4 - Time anamoly---------------------------#
+# ---------------------Featrue:4 - Time anomaly---------------------------#
 def compute_time_anomaly(tx_hour, past_hours):
 
     is_odd_hour = 1 if 0 <= tx_hour <= 5 else 0
@@ -75,3 +75,61 @@ def compute_category_diversity(recent_categories):
     if not recent_categories:
         return 0
     return len(set(recent_categories))
+
+
+# ---------------------Feature:6 - Combined Feature Vector--------------------#
+def build_feature_vector(transaction, user, past_transactions):
+    """
+    Combines all 5 categories into one dictionary for a single transaction.
+    Args:
+        transaction: dict with amount, timestamp, device_id, shipping_geo,
+            merchant_category
+        user: dict with home_geo, known_devices
+        past_transactions: list of this user's transaction BEFORE this one
+    Returns:
+    dict of feature_name -> numerical value
+
+    """
+
+    # Extract lists from past transactions
+    past_timestamps = [t["timestamp"] for t in past_transactions]
+    past_amounts = [float(t["amount"]) for t in past_transactions]
+    past_hours = [t["timestamp"].hour for t in past_transactions]
+
+    # Recent Categories
+    one_hour_ago = transaction["timestamp"] - timedelta(hours=1)
+    recent_categories = [
+        t["merchant_category"]
+        for t in past_transactions
+        if t["timestamp"] >= one_hour_ago
+    ]
+
+    # compute all features
+    velocity = compute_transaction_velocity(past_timestamps, transaction["timestamp"])
+
+    amount_deviation = compute_amount_deviation(
+        float(transaction["amount"]), past_amounts
+    )
+
+    is_new_device, is_geo_mismatch = compute_geo_device_mismatch(
+        transaction["device_id"],
+        transaction["shipping_geo"],
+        user["known_devices"],
+        user["home_geo"],
+    )
+
+    is_odd_hour, hour_deviation = compute_time_anomaly(
+        transaction["timestamp"].hour, past_hours
+    )
+
+    category_diversity = compute_category_diversity(recent_categories)
+
+    return {
+        "velocity_10min": velocity,
+        "amount_zscore": amount_deviation,
+        "is_new_device": is_new_device,
+        "is_geo_mismatch": is_geo_mismatch,
+        "is_odd_hour": is_odd_hour,
+        "hour_deviation": hour_deviation,
+        "category_diversity_1hr": category_diversity,
+    }
