@@ -177,3 +177,27 @@ def train_and_evaluate():
         "pr_auc": pr_auc_xgb,
     }
     print(f"XGBoost PR-AUC: {pr_auc_xgb:.4f}")
+
+    # ──────────── Compare & Save Best Model ────────────
+    print("\n--- Comparison ---")
+    print(f"  Isolation Forest PR-AUC: {pr_auc_iso:.4f}")
+    print(f"  XGBoost PR-AUC:          {pr_auc_xgb:.4f}")
+
+    best_name = max(results, key=lambda k: results[k]["pr_auc"])
+    best_model = results[best_name]["model"]
+    best_score = results[best_name]["pr_auc"]
+
+    print(f"\nWinner: {best_name} (PR-AUC: {best_score:.4f})")
+
+    # Save the winning model to disk
+    save_dir = os.path.join(os.path.dirname(__file__), "saved_models")
+    os.makedirs(save_dir, exist_ok=True)
+    model_path = os.path.join(save_dir, "best_model.joblib")
+    joblib.dump(best_model, model_path)
+    print(f"Model saved to: {model_path}")
+
+    return results
+
+
+if __name__ == "__main__":
+    train_and_evaluate()
