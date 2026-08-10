@@ -143,3 +143,37 @@ def train_and_evaluate():
         "pr_auc": pr_auc_iso,
     }
     print(f"Isolation Forest PR-AUC: {pr_auc_iso: .4f}")
+
+    # ---------------------------------------------------------------------- #
+    print("\n--------- Training XGBoost ---------")
+
+    # Count normal and fraud transactions
+    num_normal = sum(y_train == 0)
+    num_fraud = sum(y_train == 1)
+
+    # Give more importance to fraud since it is less common
+    scale_pos_weight = num_normal / max(num_fraud, 1)
+
+    xgb_model = xgb.XGBClassifier(
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.1,
+        scale_pos_weight=scale_pos_weight,
+        random_state=42,
+        eval_metric="aucpr",
+    )
+
+    # Train the model
+    xgb_model.fit(X_train, y_train)
+
+    # Get fraud probability for each test transaction
+    xgb_scores = xgb_model.predict_proba(X_test)[:, 1]
+
+    # Compute PR-AUC
+    precision_xgb, recall_xgb, _ = precision_recall_curve(y_test, xgb_scores)
+    pr_auc_xgb = auc(recall_xgb, precision_xgb)
+    results["xgboost"] = {
+        "model": xgb_model,
+        "pr_auc": pr_auc_xgb,
+    }
+    print(f"XGBoost PR-AUC: {pr_auc_xgb:.4f}")
