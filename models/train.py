@@ -106,3 +106,18 @@ def load_dataset_from_db():
     )
 
     return X, y
+
+
+def train_and_evaluate():
+    """Trains both, compares by PR-AUC, saves the best model"""
+
+    # 1 Load Dataset
+    X, y = load_dataset_from_db()
+
+    # 2 Spplit into 80% train, 20% test
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    print(f"\nTrain set: {len(X_train)} rows | Test set: {len(X_test)} rows.")
+    results = {}
