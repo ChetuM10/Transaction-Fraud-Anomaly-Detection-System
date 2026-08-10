@@ -121,3 +121,25 @@ def train_and_evaluate():
 
     print(f"\nTrain set: {len(X_train)} rows | Test set: {len(X_test)} rows.")
     results = {}
+
+    # ----------------------Isolation Forest--------------------------#
+    print("\n---------Training Isolation Forest---------")
+    iso_forest = IsolationForest(
+        n_estimators=100,
+        contamination=0.05,
+        random_state=42,
+    )
+    iso_forest.fit(X_train)
+
+    # converting to scores
+    # keep this in review - maybe needs change
+    iso_scores = -iso_forest.decision_function(X_test)  # higher = more suspicious
+
+    # PR-AUC
+    precision_iso, recall_iso, _ = precision_recall_curve(y_test, iso_scores)
+    pr_auc_iso = auc(recall_iso, precision_iso)
+    results["isolation_forest"] = {
+        "model": iso_forest,
+        "pr_auc": pr_auc_iso,
+    }
+    print(f"Isolation Forest PR-AUC: {pr_auc_iso: .4f}")
