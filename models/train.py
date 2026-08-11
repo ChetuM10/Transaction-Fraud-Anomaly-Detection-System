@@ -179,7 +179,7 @@ def train_and_evaluate():
     print(f"XGBoost PR-AUC: {pr_auc_xgb:.4f}")
 
     # ──────────── Compare & Save Best Model ────────────
-    print("\n--- Comparison ---")
+    print("\n--------- Comparison ---------")
     print(f"  Isolation Forest PR-AUC: {pr_auc_iso:.4f}")
     print(f"  XGBoost PR-AUC:          {pr_auc_xgb:.4f}")
 
