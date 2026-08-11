@@ -44,7 +44,7 @@ class FraudScorer:
         # third - apply threshold-based decision
         if fraud_prob < THRESHOLD_AUTO_APPROVE:
             decision = "auto_approve"
-        elif fraud_prob > THRESHOLD_AUTO_APPROVE:
+        elif fraud_prob > THRESHOLD_AUTO_BLOCK:
             decision = "auto_block"
         else:
             decision = "review"
@@ -57,3 +57,24 @@ class FraudScorer:
             "decision": decision,
             "top_features": top_features,
         }
+
+
+def eplain(self, featrue_array, features):
+
+    shap_values = self.explainer.shap_values(featrue_array)
+
+    explanations = []
+    for i, name in enumerate(FEATURE_NAMES):
+        explanations.append(
+            {
+                "feature": name,
+                "shap_value": round(float(shap_values[0][i]), 4),
+                "acutal_value": features[name],
+            }
+        )
+
+    # sort by highest value first(in descendinG order)
+    explanations.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
+
+    # Return top 3 most impactful features
+    return explanations[:3]
