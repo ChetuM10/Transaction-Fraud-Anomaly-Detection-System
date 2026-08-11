@@ -58,23 +58,92 @@ class FraudScorer:
             "top_features": top_features,
         }
 
+        # -----------------------    S H A P  Implementation   ---------------------------#
 
-def eplain(self, featrue_array, features):
+    def explain(self, feature_array, features):
 
-    shap_values = self.explainer.shap_values(featrue_array)
+        shap_values = self.explainer.shap_values(feature_array)
 
-    explanations = []
-    for i, name in enumerate(FEATURE_NAMES):
-        explanations.append(
-            {
-                "feature": name,
-                "shap_value": round(float(shap_values[0][i]), 4),
-                "acutal_value": features[name],
-            }
+        explanations = []
+        for i, name in enumerate(FEATURE_NAMES):
+            explanations.append(
+                {
+                    "feature": name,
+                    "shap_value": round(float(shap_values[0][i]), 4),
+                    "actual_value": features[name],
+                }
+            )
+
+        # sort by highest value first(in descendinG order)
+        explanations.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
+
+        # Return top 3 most impactful features
+        return explanations[:3]
+
+
+if __name__ == "__main__":
+    from db.connection import get_connection
+
+    print("Loading Score...")
+    scorer = FraudScorer()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(""" 
+        SELECT u.id, u.home_geo, u.known_devices
+        FROM users u
+        JOIN transactions t ON t.user_id = u.id
+        GROUP BY u.id
+        HAVING COUNT(t.id) >= 10
+        ORDER BY RANDOM()
+        LIMIT 1
+    """)
+    row = cursor.fetchone()
+    user = {"id": row[0], "home_geo": row[1], "known_devices": row[2]}
+
+    cursor.execute(
+        """ 
+        SELECT id, user_id, amount, merchant_category, timestamp, device_id,
+                ip_address, billing_geo, shipping_geo
+        FROM transactions
+        WHERE user_id = %s
+        ORDER BY timestamp ASC
+    """,
+        (user["id"],),
+    )
+
+    columns = [
+        "id",
+        "user_id",
+        "amount",
+        "merchant_category",
+        "timestamp",
+        "device_id",
+        "ip_address",
+        "billing_geo",
+        "shipping_geo",
+    ]
+    txs = [dict(zip(columns, r)) for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+
+    # score the last transaction using all previous ones as history
+    last_tx = txs[-1]
+    past = txs[:-1]
+
+    print(f"\nScoring Transaction: {last_tx['id']}")
+    print(f"    Amount: {last_tx['amount']}")
+    print(f"    Device: {last_tx['device_id']}")
+    print(f"    Time: {last_tx['timestamp']}")
+
+    result = scorer.score(last_tx, user, past)
+
+    print("\n-------Result-------")
+    print(f"    Fraud Score: {result['score']}")
+    print(f"    Decision: {result['decision']}")
+    print("    Top Reasons:")
+    for reason in result["top_features"]:
+        print(
+            f"    {reason['feature']} {reason['actual_value']} (SHAP: {reason['shap_value']})"
         )
-
-    # sort by highest value first(in descendinG order)
-    explanations.sort(key=lambda x: abs(x["shap_value"]), reverse=True)
-
-    # Return top 3 most impactful features
-    return explanations[:3]
