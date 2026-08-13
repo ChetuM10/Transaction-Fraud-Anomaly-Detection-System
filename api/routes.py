@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import json
 
 from db.connection import get_connection
 from models.scorer import FraudScorer
@@ -36,6 +37,7 @@ class FeatureExplanation(BaseModel):
 
 class ScoreResponse(BaseModel):
     transaction_id: str
+    flag_id: int
     score: float
     decision: str
     top_features: list[FeatureExplanation]
@@ -88,6 +90,25 @@ def fetch_past_transactions(user_id: str):
     conn.close()
     return rows
 
+
+def save_flag(transaction_id, score, top_features, decision):
+    ''' Inserts a scored transaction into the flag'''
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """ 
+        INSERT INTO flags (transaction_id, score, top_features, decision)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """,
+        (transaction_id, score, json.dumps(top_features), decision),
+    )
+    flag_id = cursor.fetchone()[0]
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return flag_id
+
 # ---------------- Endpoints ----------------#
 
 
@@ -121,8 +142,13 @@ def score_transaction(tx: TransactionIn):
     # 4 - score
     result = scorer.score(tx_dict, user, past_transactions)
 
+    # 5 - save flag to DB
+    flag_id = save_flag(tx.id, result["score"],
+                        result["top_features"], result["decision"])
+
     return ScoreResponse(
         transaction_id=tx.id,
+        flag_id=flag_id,
         score=result["score"],
         decision=result["decision"],
         top_features=result["top_features"],
