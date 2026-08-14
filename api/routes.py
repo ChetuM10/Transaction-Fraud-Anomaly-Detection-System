@@ -45,7 +45,7 @@ class ScoreResponse(BaseModel):
 
 class FlagOut(BaseModel):
     id: int
-    transaction_id: id
+    transaction_id: str
     score: float
     decision: str
     top_features: list
@@ -53,6 +53,11 @@ class FlagOut(BaseModel):
     reviewed_by: str | None
     created_at: str
     reviewed_at: str | None
+
+
+class ReviewIn(BaseModel):
+    outcome: str
+    reviewed_by: str
 
 # --------- Database Helpers ---------#
 
@@ -207,6 +212,58 @@ def list_flags(decision: str | None = None, outcome: str | None = None):
             row["reviewed_at"]) if row["reviewed_at"] else None
 
     return rows
+
+
+@app.post("flags/{flag_id}/review")
+def review_flag(flag_id: int, review: ReviewIn):
+    # Validate Outcome
+    valid_outcomes = ("true_postive", "flase_positive")
+    if review.outcome not in valid_outcomes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid outcome '{review.outcome}'. Must be one of {valid_outcomes}."
+        )
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # check if flag exists and is not already reviewed
+    cursor.execute("SELECT id, outcome FROM flags WHERE id = %s", (flag_id,))
+    flag = cursor.fetchone()
+
+    if not flag:
+        cursor.close()
+        conn.close()
+        raise HTTPException(
+            status_code=404, detail=f"Flag {flag_id} not found.")
+
+    if flag[1] != "pending":
+        cursor.close()
+        conn.close()
+        raise HTTPException(
+            status_code=400, detail=f"Flag {flag_id} has already been reviewed as '{flag[1]}'.")
+
+    # 3 update the flag
+    cursor.execute(
+        """ 
+        UPDATE flags
+        SET outcome = %s,
+            reviewed_by = %s,
+            reviewed_at = NOW()
+        WHERE id = %s
+        """,
+        (review.outcome, review.reviewed_by, flag_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return {
+        "status": "success",
+        "flag_id": flag_id,
+        "outcome": review.outcome,
+        "reviewed_by": review.reviewed_by,
+    }
 
 
 @app.get("/health")
