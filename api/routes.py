@@ -42,6 +42,18 @@ class ScoreResponse(BaseModel):
     decision: str
     top_features: list[FeatureExplanation]
 
+
+class FlagOut(BaseModel):
+    id: int
+    transaction_id: id
+    score: float
+    decision: str
+    top_features: list
+    outcome: str
+    reviewed_by: str | None
+    created_at: str
+    reviewed_at: str | None
+
 # --------- Database Helpers ---------#
 
 
@@ -153,6 +165,48 @@ def score_transaction(tx: TransactionIn):
         decision=result["decision"],
         top_features=result["top_features"],
     )
+
+
+@app.get("/flags", response_model=list[FlagOut])
+def list_flags(decision: str | None = None, outcome: str | None = None):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = "SELECT id, transaction_id, score, decision, top_features, outcome, reviewed_by, created_at, reviewed_at FROM flags"
+    conditions = []
+    params = []
+
+    if decision:
+        conditions.append("decision = %s")
+        params.append(decision)
+    if outcome:
+        conditions.append("outcome = %s")
+        params.append(outcome)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY score DESC "
+
+    cursor.execute(query, tuple(params))
+
+    columns = ["id", "transaction_id", "score", "decision", "top_features",
+               "outcome", "reviewed_by", "created_at", "reviewed_at"]
+
+    rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    cursor.close()
+    conn.close()
+
+    # convert datetime objects to strings for JSON
+    for row in rows:
+        row["score"] = float(row["score"])
+        row["created_at"] = str(row["created_at"])
+        row["reviewed_at"] = str(
+            row["reviewed_at"]) if row["reviewed_at"] else None
+
+    return rows
 
 
 @app.get("/health")
