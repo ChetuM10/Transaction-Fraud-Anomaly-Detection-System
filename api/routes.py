@@ -214,10 +214,10 @@ def list_flags(decision: str | None = None, outcome: str | None = None):
     return rows
 
 
-@app.post("flags/{flag_id}/review")
+@app.post("/flags/{flag_id}/review")
 def review_flag(flag_id: int, review: ReviewIn):
     # Validate Outcome
-    valid_outcomes = ("true_postive", "flase_positive")
+    valid_outcomes = ("true_positive", "false_positive")
     if review.outcome not in valid_outcomes:
         raise HTTPException(
             status_code=400,
