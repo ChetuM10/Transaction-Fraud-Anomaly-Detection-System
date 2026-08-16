@@ -1,15 +1,15 @@
 /** @type {import('tailwind').Config} */
 export default {
-    xontent: [
+    content: [
         "./index.html",
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
         extend: {
             colors: {
-                background: '#09090b', // Deep sentinel black (zinc-950)
-                card: '#18181b',       // Slightly lighter black for cards
-                border: '#27272a',     // Subtle border color
+                background: '#09090b', // Deep sentinel black
+                card: '#18181b',       // lighter black for cards
+                border: '#27272a',     // border color
                 brand: {
                     green: '#10b981',    // Approve
                     yellow: '#f59e0b',   // Review
