@@ -74,4 +74,55 @@ export function FlagsTable({ onSelectFlag }: FlagsTableProps) {
         );
     }
   };
+
+  return (
+    <div className="space-y-4">
+      {/* header and filter bar */}
+      <div
+        className="felx flex-col sm:flex-row justify-between items-start sm:items-center
+      gap-4 bg-card p-4 rounded-lg border border-border"
+      >
+        <div className="flex items-center space-x-3">
+          <span className="text-sm text-gray-400">Filters:</span>
+
+          {/* outcome filter */}
+          <select
+            value={filterOutcome}
+            onChange={(e) => setFilterOutcome(e.target.value)}
+            className="bg-background border border-border text-xs text-white rounded-md
+              px-d3 py-1.5 focus:outline-none focus:border-gray-500"
+          >
+            <option value="">All Outcomes</option>
+            <option value="pending">Pending Review</option>
+            <option value="true_positive">Confirmed Fraud</option>
+            <option value="flase_positive">False Positive</option>
+          </select>
+
+          {/* Decision Filter */}
+          <select
+            value={filterDecision}
+            onChange={(e) => setFilterDecision(e.target.value)}
+            className="bg-background border border-border text-xs text-white rounded-md
+            px-d3 py-1.5 focus:outline-none focus:border-gray-500"
+          >
+            <option value="">All Decisions</option>
+            <option value="review">Needs Review</option>
+            <option value="auto_block">Auto Blocked</option>
+            <option value="auto+_approve">Auto Approved</option>
+          </select>
+        </div>
+
+        <button
+          onClick={loadFlags}
+          className="inline-flex items-center text-xs text-gray-300 hover:text-white
+        bg-background border border-border hover:bg-border/50 px-3 py-1.5 rounded-md transition-colors"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </button>
+      </div>
+    </div>
+  );
 }
