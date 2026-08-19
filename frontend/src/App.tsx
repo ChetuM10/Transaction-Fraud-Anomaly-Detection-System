@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
+import { FlagsTable } from "./components/queue/FlagsTable";
+import type { Flag } from "./types/fraud";
 
 export default function App() {
   //this remembers which tab is currently active
   const [activeTab, setActiveTab] = useState<"overview" | "queue">("queue");
+  const [selectedFlag, setSelectedFlag] = useState<Flag | null>(null);
 
   return (
     <div className="flex min-h-screen bg-background text-white">
@@ -21,9 +24,16 @@ export default function App() {
         )}
 
         {activeTab === "queue" && (
-          <div>
-            <h1 className="text-3xl font-bold mb-4">Reviewer Queue</h1>
-            <p className="text-gray-400">Table transactions will go here...</p>
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-4">Reviewer Queue</h1>
+              <p className="text-gray-400">
+                Inspect high-risk transactions and submit analyst decisions.
+              </p>
+            </div>
+
+            {/* table rendering */}
+            <FlagsTable onSelectFlag={(flag) => setSelectedFlag(flag)} />
           </div>
         )}
       </div>
