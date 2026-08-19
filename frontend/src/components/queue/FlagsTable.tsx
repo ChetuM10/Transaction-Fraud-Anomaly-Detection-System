@@ -41,4 +41,37 @@ export function FlagsTable({ onSelectFlag }: FlagsTableProps) {
   useEffect(() => {
     loadFlags();
   }, [filterDecision, filterOutcome]);
+
+  //helper for decision badges
+  const renderDecisionBadge = (decision: string) => {
+    switch (decision) {
+      case "auto_approve":
+        return (
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs
+          font-medium bg-emeral-950 text-emerald-400 border border-emerald-800"
+          >
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Approve
+          </span>
+        );
+      case "auto_block":
+        return (
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs
+          font-medium bg-rose-950 text-rose-400 border border-rose-800"
+          >
+            <XCircle className="w-3 h-3 mr-1" /> Block
+          </span>
+        );
+      default:
+        return (
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-fill text-xs
+          font-medium bg-amber-950 text-amber-400 border border-amber-800"
+          >
+            <AlertCircle className="w-3 h-3 mr-1" /> Review
+          </span>
+        );
+    }
+  };
 }
