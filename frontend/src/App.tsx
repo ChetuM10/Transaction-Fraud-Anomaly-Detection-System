@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { FlagsTable } from "./components/queue/FlagsTable";
+import { ReviewPanel } from "./components/queue/ReviewPanel";
 import type { Flag } from "./types/fraud";
 
 export default function App() {
@@ -37,6 +38,17 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* REVIEW - RENDERS WHEN A FLAG IS SELECTED */}
+      {selectedFlag && (
+        <ReviewPanel
+          flag={selectedFlag}
+          onClose={() => setSelectedFlag(null)}
+          onReviewed={() => {
+            setSelectedFlag(null);
+          }}
+        />
+      )}
     </div>
   );
 }
