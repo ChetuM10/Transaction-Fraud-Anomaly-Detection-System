@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Flag } from "../../types/fraud";
 import { fetchFlags } from "../../api/client";
-import {
-  ShieldAlert,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  TrendingUp,
-} from "lucide-react";
+import { ShieldAlert, Clock, XCircle, TrendingUp } from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -99,7 +93,7 @@ export function OverviewDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grind-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Flags */}
         <div className="bg-card border border border p-5 rounded-xl space-y-2">
           <div className="flex items-center justify-between text-gray-400">
@@ -118,10 +112,22 @@ export function OverviewDashboard() {
             </span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-2xl font-bol text-rose-400">
+          <p className="text-2xl font-bol text-rose-400">{pendingCount}</p>
+          <p className="text-xs text-gray-500">Awaiting human analyst review</p>
+        </div>
+
+        {/* Card 3: Confirmed Fraud */}
+        <div className="bg-card border border-border p-5 rounded-xl space-y-2">
+          <div className="flex items-center justify-between text-gray-400">
+            <span className="text-xs font-medium uppercase">
+              Confirmed Fraud
+            </span>
+            <XCircle className="w-4 h-4 text-rose-400" />
+          </div>
+          <p className="text-2xl font-bold text-rose-400">
             {confirmedFraudCount}
           </p>
-          <p className="text-xs text-gray-500">Awaiting human analyst review</p>
+          <p className="text-xs text-gray-500">Marked True Positive</p>
         </div>
 
         {/* Avg Risk Score */}
