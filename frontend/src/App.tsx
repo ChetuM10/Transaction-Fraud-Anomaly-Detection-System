@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { FlagsTable } from "./components/queue/FlagsTable";
 import { ReviewPanel } from "./components/queue/ReviewPanel";
+import { OverviewDashboard } from "./components/overview/OverviewDashboard";
 import type { Flag } from "./types/fraud";
 
 export default function App() {
@@ -17,12 +18,7 @@ export default function App() {
       {/* main content */}
       <div className="flex-1 p-8 overflow-auto">
         {/* simple paceholder for now */}
-        {activeTab === "overview" && (
-          <div>
-            <h1 className="text-3xl font-bol mb-4"> Overview Dashboard</h1>
-            <p className="text-gray-400">KPIs and Charts will go here...</p>
-          </div>
-        )}
+        {activeTab === "overview" && <OverviewDashboard />}
 
         {activeTab === "queue" && (
           <div className="space-y-6">
