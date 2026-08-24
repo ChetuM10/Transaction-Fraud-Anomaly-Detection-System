@@ -277,6 +277,28 @@ def review_flag(flag_id: int, review: ReviewIn):
     }
 
 
+@app.get("/model_versions")
+def list_model_versions():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """ 
+        SELECT id, trained_at, metrics, feature_list, model_path
+        FROM model_versions
+        ORDER BY trained_at DESC
+        """
+    )
+    columns = ["id", "trained_at", "metrics", "feature_list", "model_path"]
+    rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+
+    for row in rows:
+        row["trained_at"] = str(roq["trained_at"])
+
+    return rows
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "model_loaded": scorer.model is not None}
