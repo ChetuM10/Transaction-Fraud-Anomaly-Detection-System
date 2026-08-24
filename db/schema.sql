@@ -37,3 +37,12 @@ CREATE Table IF NOT EXISTS flags (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     reviewed_at TIMESTAMP
 );
+
+-- MOdel versions: tracks trained model for sudit and rollback
+CREATE TABLE IF NOT EXISTS model_versions (
+    id SERIAL PRIMARY KEY,
+    trained_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    metrics JSONB NOT NULL,
+    feature_list TEXT[] NOT NULL,
+    model_path VARCHAR(255) NOT NULL
+);
