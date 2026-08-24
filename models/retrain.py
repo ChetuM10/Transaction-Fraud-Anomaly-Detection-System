@@ -25,13 +25,13 @@ def loaded_labeled_dataset():
 
     # 1. fetch all users
     cursor.execute(
-        "SELECT id, avg_tansaction_amount, home_geo, known_devices FROM users"
+        "SELECT id, avg_transaction_amount, home_geo, known_devices FROM users"
     )
     users = {}
     for row in cursor.fetchall():
         users[row[0]] = {
             "id": row[0],
-            "avg_tansaction_amount": float(row[1]),
+            "avg_transaction_amount": float(row[1]),
             "home_geo": row[2],
             "known_devices": row[3],
         }
@@ -54,3 +54,64 @@ def loaded_labeled_dataset():
     ]
 
     rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    # 3. fetch all transactions for building user history
+    cursor.execute(
+        """
+        SELECT id, user_id, amount, merchant_category, timestamp, device_id,
+               ip_address, billing_geo, shipping_geo
+        FROM transactions ORDER BY timestamp
+        """
+    )
+    tx_columns = [
+        "id", "user_id", "amount", "merchant_category", "timestamp",
+        "device_id", "ip_address", "billing_geo", "shipping_geo",
+    ]
+    all_txs = [dict(zip(tx_columns, r)) for r in cursor.fetchall()]
+
+    cursor.close()
+    conn.close()
+
+    if len(rows) < 10:
+        print(
+            f"{len(rows)} reviewed flags found. 10 atleast are needed for retraining.")
+        return None, None
+
+    print(f"Found {len(rows)} reviewer-labled flags for retraining.")
+
+    # 4. this builds user history from ALL transactions and not jsut the labled ones
+    user_history = defaultdict(list)
+    tx_lookup = {}
+    for tx in all_txs:
+        user_history[tx["user_id"]].append(tx)
+        tx_lookup[tx["id"]] = tx
+
+    # 5. build feature vectors using the same engineering pipeline
+    feature_rows = []
+    labels = []
+
+    for row in rows:
+        u_id = row["user_id"]
+        user = users.get(u_id)
+        if not user:
+            continue
+
+        past_txs = [
+            t for t in user_history[u_id]
+            if t["timestamp"] < row["timestamp"]
+        ]
+
+        feats = build_feature_vector(row, user, past_txs)
+        feature_rows.append(feats)
+
+        # label comes after HUMAN reviewer
+        label = 1 if row["outcome"] == "true_positive" else 0
+        labels.append(label)
+
+    X = pd.DataFrame(feature_rows)
+    y = np.array(labels)
+
+    print(f"Features built: {X.shape}")
+    print(f"Lables -> Normal: {sum(y == 0)}, Fraud: {sum(y == 1)}")
+
+    return X, y
