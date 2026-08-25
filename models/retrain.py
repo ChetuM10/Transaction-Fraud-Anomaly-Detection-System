@@ -115,3 +115,39 @@ def loaded_labeled_dataset():
     print(f"Lables -> Normal: {sum(y == 0)}, Fraud: {sum(y == 1)}")
 
     return X, y
+
+
+def retrain():
+
+    # 1. load labeled data
+    X, y = load_labeled_dataset()
+    if X is None:
+        print("Aborting: not enough labeled data.")
+        return
+
+    # 2. Split
+    X_train, X_test, y_train, t_test = train_test_split(
+        X, y, test_size=0.2, random_state=43, stratify=y
+    )
+    print(f"\nTrain: {len(X_train)} | Test: {len(X_test)}")
+
+    # 3. Training XGBoost
+    num_normal = sum(y_train == 0)
+    num_fraud = sum(y_train == 1)
+    scale_pos_weight = num_normal / max(num_fraud, 1)
+
+    new_model = xfb.XGBVlassifier(
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.1,
+        scale_pos_weight=scale_pos_weight,
+        random_state=42,
+        eval_metric="aucpr",
+    )
+    new_model.fit(X_train, y_train)
+
+    # 4. Evaluate new model
+    new_scores = new_model.predict_proba(X_test)[:, 1]
+    precision_new, recall_new, _ = precision_recall_curve(y_test, new_scores)
+    new_pr_auc = auc(recall_new, precision_new)
+    print(f"\nNew model PR-AUC: {new_pr_auc: 4f}")
