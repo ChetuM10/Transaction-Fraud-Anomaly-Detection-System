@@ -26,7 +26,8 @@ export async function submitReview(flagId: number, review: ReviewSubmission):
     });
 
     if (!response.ok) {
-        throw new Error('Failed to submit review');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to submit review.');
     }
 
     return response.json();
