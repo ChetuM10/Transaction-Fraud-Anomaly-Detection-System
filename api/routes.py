@@ -294,7 +294,7 @@ def list_model_versions():
     conn.close()
 
     for row in rows:
-        row["trained_at"] = str(roq["trained_at"])
+        row["trained_at"] = str(row["trained_at"])
 
     return rows
 
