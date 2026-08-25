@@ -16,7 +16,7 @@ from db.connection import get_connection
 from features.engineering import build_feature_vector
 
 
-def loaded_labeled_dataset():
+def load_labeled_dataset():
     """ this fetches review-confirmed flags joined with their transactions
     and users. Returns X (features) and y (labels from human reviewers)."""
 
@@ -74,7 +74,7 @@ def loaded_labeled_dataset():
 
     if len(rows) < 10:
         print(
-            f"{len(rows)} reviewed flags found. 10 atleast are needed for retraining.")
+            f"{len(rows)} reviewed flags found. Atleast 10 are needed for retraining.")
         return None, None
 
     print(f"Found {len(rows)} reviewer-labled flags for retraining.")
@@ -126,7 +126,7 @@ def retrain():
         return
 
     # 2. Split
-    X_train, X_test, y_train, t_test = train_test_split(
+    X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=43, stratify=y
     )
     print(f"\nTrain: {len(X_train)} | Test: {len(X_test)}")
@@ -136,7 +136,7 @@ def retrain():
     num_fraud = sum(y_train == 1)
     scale_pos_weight = num_normal / max(num_fraud, 1)
 
-    new_model = xfb.XGBVlassifier(
+    new_model = xgb.XGBClassifier(
         n_estimators=100,
         max_depth=4,
         learning_rate=0.1,
@@ -163,6 +163,7 @@ def retrain():
             current_scores = current_model.predict_proba(X_test)[:, 1]
             precision_cur, recall_cur, _ = precision_recall_curve(
                 y_test, current_scores)
+            current_pr_auc = auc(recall_cur, precision_cur)
             print(f"Current model PR-AUC: {current_pr_auc: .4f}")
         except Exception:
             print("Current model incompatible with new features. Treating as baseline 0.")
@@ -173,7 +174,7 @@ def retrain():
         current_pr_auc = 0.0
 
     # 6. Compare
-    print(f"\m------------Comparison------------")
+    print(f"\n------------Comparison------------")
     print(f" Current PR-AUC: {current_pr_auc: .4f}")
     print(f" New PR-AUC:    {new_pr_auc: .4f}")
 
