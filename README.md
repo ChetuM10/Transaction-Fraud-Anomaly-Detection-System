@@ -1,86 +1,231 @@
 # Transaction Fraud & Anomaly Detection System
 
-A real-time fraud detection service that scores transactions against each user's behavioral baseline — not static rules — and flags anomalies with human-readable explanations for reviewer action.
+A machine learning system that detects fraudulent transactions by comparing activity against each user's historical behavioral baseline. It features real-time SHAP explainability, an interactive human-analyst review dashboard, and an automated feedback retraining loop.
 
-## Problem
+---
 
-Small fintech platforms and marketplaces can't afford enterprise fraud tools like Sift or Stripe Radar. Most rely on hand-written rules ("flag if amount > X") which miss new fraud patterns and generate excessive false positives.
+## 1. Overview & Problem
 
-## Solution
+### The Problem
 
-A scoring service that builds a behavioral profile per user (typical amount, location, device, frequency) and flags transactions that deviate significantly — with an explanation of *why* it was flagged, so a human reviewer can act quickly.
+Traditional fraud detection systems at smaller fintech companies rely heavily on static, hardcoded rules (such as `amount > 5000` or `country != home_country`). These rules fail in two major ways:
 
-## Architecture
+1. **High False Positive Rates:** A legitimate user making a rare high-value purchase gets blocked unnecessarily, causing customer friction.
+2. **Blind to Behavioral Shifts:** Fraudsters operating below hard limits (e.g., draining small amounts from an unusual device at 3 AM) pass through unnoticed.
 
-```
-Checkout → FastAPI Scoring API → Feature Engineering → Model + SHAP → Score + Reasons
-                  ↕                                                        ↓
-             PostgreSQL                                              Flags Table
-            (users, transactions)                                        ↓
-                                                                  React Dashboard
-                                                                  (review + feedback)
-```
+### The Solution
 
-## Key Features
+Instead of static rules, this system constructs a personalized behavioral profile for each user (historical average spend, known devices, typical transaction hours, and geographic history). Every incoming transaction is scored dynamically using machine learning, explainability vectors (TreeSHAP) are generated in real time, and human analysts can confirm or dismiss flags to continuously retrain and improve the model.
 
-- **Behavioral baseline scoring** — compares each transaction against the user's own history, not one-size-fits-all rules
-- **Dual model comparison** — Isolation Forest (unsupervised) vs XGBoost (supervised), evaluated with PR-AUC
-- **Explainable flags** — SHAP-powered explanations ("amount is 4x user's average", "new device") for every flagged transaction
-- **Reviewer dashboard** — queue, detail view, and outcome marking (true/false positive)
-- **Feedback loop** — reviewer outcomes feed back into model evaluation and retraining
+---
 
-## Tech Stack
+## 2. Technical File-Level Flow Diagram
 
-| Layer | Technology |
-|-------|-----------|
-| Backend / ML | Python, FastAPI, scikit-learn, XGBoost, SHAP |
-| Database | PostgreSQL |
-| Frontend | React |
-| Deployment | Render / Railway |
-
-## Database Schema
+The diagram below illustrates how each file in the codebase communicates across the data, backend, frontend, and retraining pipelines:
 
 ```
-users ──1:N── transactions ──1:1── flags ──N:1── model_versions
+                      INCOMING TRANSACTION PAYLOAD
+                                  │
+                                  ▼
+               ┌──────────────────────────────────────┐
+               │         api/routes.py                │
+               │ (FastAPI Router & Endpoint Handlers) │
+               └──────────────────┬───────────────────┘
+                                  │
+                  ┌───────────────┴───────────────┐
+                  │ Fetch User Profile & History  │
+                  ▼                               ▼
+       ┌─────────────────────┐         ┌─────────────────────┐
+       │  db/connection.py   │         │  models/scorer.py   │
+       │ (PostgreSQL Driver) │         │ (FraudScorer Class) │
+       └──────────┬──────────┘         └──────────┬──────────┘
+                  │                               │
+                  │ Reads DB                      │ Calls Feature Engine
+                  ▼                               ▼
+       ┌─────────────────────┐         ┌────────────────────────┐
+       │   PostgreSQL DB     │         │ features/engineering.py│
+       │ (users/transactions)│         │ (7 Behavioral Signals) │
+       └─────────────────────┘         └──────────┬─────────────┘
+                                                  │
+                                                  ▼
+                                       ┌────────────────────────┐
+                                       │ models/saved_models/   │
+                                       │   best_model.joblib    │
+                                       │ (Trained XGBoost)      │
+                                       └──────────┬─────────────┘
+                                                  │
+                                                  ▼
+                                       ┌────────────────────────┐
+                                       │    TreeSHAP Engine     │
+                                       │ (Top 3 Impact Reasons) │
+                                       └──────────┬─────────────┘
+                                                  │
+                                                  ▼
+                                       ┌────────────────────────┐
+                                       │   POST /flags (Saved)  │
+                                       └──────────┬─────────────┘
+                                                  │
+                                                  ▼
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                             FRONTEND UI LAYER                               │
+ │                                                                             │
+ │    ┌─────────────────────────┐           ┌─────────────────────────────┐    │
+ │    │ frontend/api/client.ts  │ ◄───────► │    frontend/src/App.tsx     │    │
+ │    │  (Type-Safe API Courier)│           │   (Tab & State Manager)     │    │
+ │    └────────────┬────────────┘           └──────────────┬──────────────┘    │
+ │                 │                                       │                   │
+ │                 ▼                                       ▼                   │
+ │    ┌─────────────────────────┐           ┌─────────────────────────────┐    │
+ │    │ queue/FlagsTable.tsx    │           │ overview/OverviewDashboard  │    │
+ │    │ (Filterable Flag Queue) │           │ (KPI Cards & Volume Chart)  │    │
+ │    └────────────┬────────────┘           └─────────────────────────────┘    │
+ │                 │                                                           │
+ │                 ▼                                                           │
+ │    ┌─────────────────────────┐           ┌─────────────────────────────┐    │
+ │    │ queue/ReviewPanel.tsx   │ ────────► │    queue/ShapChart.tsx      │    │
+ │    │ (Analyst Decision Modal)│           │   (Recharts Visualization)  │    │
+ │    └────────────┬────────────┘           └─────────────────────────────┘    │
+ └─────────────────┼───────────────────────────────────────────────────────────┘
+                   │
+                   │ Human Verdict: Confirm Fraud (TP) / False Positive (FP)
+                   ▼
+       ┌───────────────────────┐
+       │     PostgreSQL DB     │
+       │  flags table updated  │
+       └───────────┬───────────┘
+                   │
+                   │ Periodic Retraining
+                   ▼
+       ┌───────────────────────┐
+       │   models/retrain.py   │
+       │  (Continuous Learning │
+       │    & PR-AUC Gating)   │
+       └───────────┬───────────┘
+                   │
+                   │ If New PR-AUC > Active Model PR-AUC
+                   ▼
+       ┌───────────────────────┐
+       │   model_versions DB   │
+       │ (Audit Trail & Deploy)│
+       └───────────────────────┘
 ```
 
-## API Endpoints
+---
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/score` | Score a transaction in real time |
-| GET | `/flags` | List flagged transactions |
-| POST | `/flags/{id}/review` | Submit reviewer outcome |
-| GET | `/model-versions` | List model versions + metrics |
+## 3. Tech Stack
 
-## Project Roadmap
+| Layer                  | Technology                           | Key Details                                                      |
+| ---------------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| **Backend Framework**  | Python 3.10+, FastAPI, Uvicorn       | Async ASGI server, Pydantic validation, CORS middleware          |
+| **Machine Learning**   | XGBoost, Scikit-Learn                | Supervised classification, `scale_pos_weight` imbalance handling |
+| **Explainability**     | SHAP (SHapley Additive exPlanations) | Exact local feature contribution vectors via `TreeExplainer`     |
+| **Database**           | PostgreSQL 14+, `psycopg2`           | Relational schema with JSONB metadata and foreign key integrity  |
+| **Frontend Framework** | React 18, TypeScript, Vite           | Strict type safety, single-page client architecture              |
+| **Styling & Icons**    | Tailwind CSS v4, Lucide React        | Glassmorphic dark theme, responsive grid layouts                 |
+| **Data Visualization** | Recharts                             | Interactive SVG horizontal bar charts & decision distributions   |
 
-- [x] Database schema + synthetic data generator
-- [ ] Feature engineering (velocity, amount deviation, geo/device mismatch, time-of-day)
-- [ ] Model training + PR-AUC evaluation
-- [ ] Threshold tuning + SHAP integration
-- [ ] FastAPI scoring endpoint
-- [ ] Flags table + review endpoints
-- [ ] React reviewer dashboard
-- [ ] Model versioning + retraining script
+---
 
-## Setup
+## 4. The 7 Behavioral Feature Signals (`features/engineering.py`)
+
+Every transaction is converted into a 7-dimensional behavioral feature vector computed against that user's historical baseline:
+
+1. **`amount_zscore`**: Number of standard deviations the transaction amount deviates from the user's historical spend average ($Z = \frac{x - \mu}{\sigma}$).
+2. **`is_new_device`**: Binary indicator (1 if current `device_id` is not present in user's `known_devices` list, else 0).
+3. **`is_geo_mismatch`**: Binary indicator (1 if `shipping_geo` differs from user's primary `home_geo`, else 0).
+4. **`hour_deviation`**: Angular/cyclical deviation of transaction hour from user's normal active hours.
+5. **`velocity_1hr`**: Number of transactions attempted by the user in the past 60 minutes.
+6. **`velocity_24hr`**: Number of transactions attempted by the user in the past 24 hours.
+7. **`category_diversity_1hr`**: Count of distinct merchant categories accessed in the last 1 hour (detects rapid automated card testing).
+
+---
+
+## 5. API Endpoints (`api/routes.py`)
+
+| Method | Endpoint             | Description                                                                                                                       |
+| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/score`             | Ingests transaction JSON, queries user history, builds features, runs XGBoost + SHAP, and saves flag to DB.                       |
+| `GET`  | `/flags`             | Fetches scored transactions with optional filters (`?decision=auto_block&outcome=pending`).                                       |
+| `POST` | `/flags/{id}/review` | Submits human analyst verdict (`true_positive` / `false_positive`), records timestamp and reviewer name. Prevents double-reviews. |
+| `GET`  | `/model-versions`    | Lists all trained model iterations, training dates, metrics (PR-AUC), and artifact paths.                                         |
+| `GET`  | `/health`            | Health check verifying database connectivity and model memory allocation.                                                         |
+
+---
+
+## 6. Significance & Business Impact
+
+1. **Explainable AI (XAI) for Regulatory Compliance:** Financial compliance requires organizations to explain _why_ an automated system declined or flagged a customer transaction. SHAP values translate black-box gradient boosting outputs into readable, defensible root causes.
+2. **PR-AUC Optimization for Severe Class Imbalance:** Fraud datasets typically exhibit severe class imbalance (~1–3% positive fraud rate). Standard accuracy metrics give a false sense of security (a model predicting 100% normal transactions can achieve 98% accuracy). Evaluating on Precision-Recall AUC ensures the system prioritizes true positive detection without overwhelming analysts with false alarms.
+3. **Audit Trail & Rollback Governance:** The `model_versions` registry ensures every deployed model binary has an immutable record of its training parameters, exact feature list, and evaluation metrics, eliminating undocumented production deployments.
+4. **Operational Triage Efficiency:** Three-tiered automated decisioning (**Auto-Approve**, **Needs Review**, **Auto-Block**) reduces manual review workload by routing only borderline, ambiguous transactions to human investigators.
+
+---
+
+## 7. Setup & Execution Guide
+
+### 1. Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+
+
+### 2. Backend Installation & Database Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/ChetuM10/Transaction-Fraud-Anomaly-Detection-System.git
+cd Transaction-Fraud-Anomaly-Detection-System
+
 # Create virtual environment
-python -m venv venv
-.\venv\Scripts\Activate    # Windows
+python -m venv .venv
+.\.venv\Scripts\Activate    # Windows (or source .venv/bin/activate on Linux/macOS)
 
-# Install dependencies
-pip install psycopg2-binary pandas numpy faker python-dotenv
+# Install Python packages
+pip install fastapi uvicorn scikit-learn xgboost shap pandas numpy psycopg2-binary python-dotenv joblib
 
-# Create database
+# Create and initialize database
 psql -U postgres -c "CREATE DATABASE fraud_detection;"
-
-# Run schema
 psql -U postgres -d fraud_detection -f db/schema.sql
+
+# Generate synthetic behavioral dataset and train initial model
+py -m data.generator
+py -m models.train
 ```
 
-## License
+### 3. Running the Servers
 
-MIT
+**Backend API (Port 8000):**
+
+```bash
+py -m uvicorn api.routes:app --reload --port 8000
+```
+
+_Interactive Swagger docs available at `http://localhost:8000/docs`._
+
+**Frontend Dashboard (Port 5173):**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+_Dashboard available at `http://localhost:5173`._
+
+### 4. Running Feedback Retraining
+
+Once analysts have submitted 10+ reviews in the dashboard:
+
+```bash
+py -m models.retrain
+```
+
+---
+
+## 8. Future Advancements & Research Roadmap
+
+1. **Population Stability Index (PSI) & Concept Drift Monitoring:** Implement automated drift checks that compare inference feature distributions over rolling 7-day windows against baseline training distributions to catch emerging macroeconomic shifts or seasonal spending changes before model degradation occurs.
+2. **Graph Neural Networks (GNNs) for Fraud Rings:** Incorporate graph embeddings (e.g., GraphSAGE) to uncover multi-account syndicates sharing identical device fingerprints, card tokens, or IP subnets across disparate user identities.
+3. **Streaming Ingestion with Apache Kafka / Redis Streams:** Transition from synchronous REST scoring to high-throughput message streaming to handle tens of thousands of transactions per second with sub-10ms latency.
+4. **Automated Shadow Deployment (A/B Testing):** Deploy newly retrained candidate models in shadow mode (scoring live traffic without making blocking decisions) to validate performance on production distributions prior to active traffic promotion.
+5. **PII Masking & Tokenization:** Incorporate client-side hashing and format-preserving encryption (FPE) for IP addresses, geolocation coordinates, and device identifiers to meet strict data privacy frameworks (GDPR, PCI-DSS).
