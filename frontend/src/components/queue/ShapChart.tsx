@@ -36,8 +36,8 @@ export function ShapChart({ features }: ShapChartProps) {
               borderRadius: "8px",
               color: "#fff",
             }}
-            formatter={(value: number, _name: string, props: any) => [
-              `SHAP: ${value.toFixed(4)} | Actual: ${props.payload.actual_value}`,
+            formatter={(value: number | string | undefined, _name: string, props: any) => [
+              `SHAP: ${typeof value === 'number' ? value.toFixed(4) : value} | Actual: ${props.payload.actual_value}`,
               props.payload.feature,
             ]}
           />
