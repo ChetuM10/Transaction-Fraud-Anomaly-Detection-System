@@ -28,4 +28,4 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://fraud-api.onrender.com
+        value: https://fraud-api-2m10.onrender.com
