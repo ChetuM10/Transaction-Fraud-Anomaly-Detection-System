@@ -50,7 +50,8 @@ def generate_users(num_users):
     for _ in range(num_users):
         user_id = f"u_{uuid.uuid4().hex[:8]}"
         created_days_ago = random.randint(30, 730)  # account age
-        created_at = datetime.now(timezone.utc) - timedelta(days=created_days_ago)
+        created_at = datetime.now(timezone.utc) - \
+            timedelta(days=created_days_ago)
         avg_amount = round(random.uniform(200, 15000), 2)  # spend range
         home_geo = random.choice(CITIES)
         num_devices = random.randint(1, 3)
@@ -141,7 +142,8 @@ def generate_transactions(users, num_transactions, fraud_ratio):
             if fraud_type == "amount_spike":
                 # say 5 - 12 times higher than user spending baseline
                 amount = round(
-                    user["avg_transaction_amount"] * random.uniform(5.0, 12.0), 2
+                    user["avg_transaction_amount"] *
+                    random.uniform(5.0, 12.0), 2
                 )
                 device_id = random.choice(user["known_devices"])
                 billing_geo = user["home_geo"]
@@ -149,7 +151,8 @@ def generate_transactions(users, num_transactions, fraud_ratio):
             elif fraud_type == "device_location_mismatch":
                 # Normal amount but, different device + different country/city
                 amount = round(random.uniform(500, 5000), 2)
-                device_id = f"device_{random.randint(9000, 9999)}"  # unkown device
+                # unkown device
+                device_id = f"device_{random.randint(9000, 9999)}"
                 billing_geo = user["home_geo"]
                 shipping_geo = random.choice(
                     [c for c in CITIES if c != user["home_geo"]]
@@ -157,7 +160,8 @@ def generate_transactions(users, num_transactions, fraud_ratio):
             else:
                 # Odd hours transactions (2 AM - 4 AM)
                 amount = round(
-                    user["avg_transaction_amount"] * random.uniform(3.0, 7.0), 2
+                    user["avg_transaction_amount"] *
+                    random.uniform(3.0, 7.0), 2
                 )
                 device_id = random.choice(user["known_devices"])
                 billing_geo = user["home_geo"]
@@ -185,6 +189,7 @@ def generate_transactions(users, num_transactions, fraud_ratio):
                 "ip_address": ip_address,
                 "billing_geo": billing_geo,
                 "shipping_geo": shipping_geo,
+                "is_fraud": 1 if is_fraud else 0,
             }
         )
     return transactions
@@ -198,9 +203,9 @@ def insert_transactions(transactions):
         cursor.execute(
             """
             INSERT INTO transactions (
-            id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo
+            id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo, is_fraud
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING
             """,
             (
@@ -213,6 +218,7 @@ def insert_transactions(transactions):
                 t["ip_address"],
                 t["billing_geo"],
                 t["shipping_geo"],
+                t["is_fraud"],
             ),
         )
     conn.commit()
