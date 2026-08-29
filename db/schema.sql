@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     device_id VARCHAR(100),
     ip_address VARCHAR(45),
     billing_geo VARCHAR(100),
-    shipping_geo VARCHAR(100)
+    shipping_geo VARCHAR(100),
+    is_fraud INTEGER DEFAULT 0
 );
 
 -- Flags Table: stores transactions for review
