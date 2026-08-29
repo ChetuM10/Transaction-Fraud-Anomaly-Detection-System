@@ -40,7 +40,7 @@ def load_dataset_from_db():
     # 2. Fetch all transactions ordered by timestamp
     cursor.execute(""" 
         SELECT id, user_id, amount, merchant_category, timestamp,
-        device_id, ip_address, billing_geo, shipping_geo
+        device_id, ip_address, billing_geo, shipping_geo, is_fraud
         FROM transactions
         ORDER BY timestamp ASC    
     """)
@@ -54,13 +54,15 @@ def load_dataset_from_db():
         "ip_address",
         "billing_geo",
         "shipping_geo",
+        "is_fraud"
     ]
     raw_txs = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     cursor.close()
     conn.close()
 
-    print(f"Loaded {len(users)} users and {len(raw_txs)} transactions from PostgreSQL.")
+    print(
+        f"Loaded {len(users)} users and {len(raw_txs)} transactions from PostgreSQL.")
 
     # -------------------------------------------------------------------------#
     # 3. Group transactions by user to build past history sequentially
@@ -77,20 +79,8 @@ def load_dataset_from_db():
         feats = build_feature_vector(tx, user, past_txs)
         feature_rows.append(feats)
 
-        # determines truth label (1=fraud, 0=normal) based on set rules
-        amount = float(tx["amount"])
-        user_avg = user["avg_transaction_amount"]
-        is_new_device = 1 if tx["device_id"] not in user["known_devices"] else 0
-        is_geo_mismatch = 1 if tx["shipping_geo"] != user["home_geo"] else 0
-        is_odd_hour = 1 if 2 <= tx["timestamp"].hour <= 4 else 0
-
-        is_fraud = 0
-        if (
-            amount >= 4.5 * user_avg
-            or (is_new_device == 1 and is_geo_mismatch == 1)
-            or (is_odd_hour == 1 and amount >= 2.5 * user_avg)
-        ):
-            is_fraud = 1
+        # determine truth label directly from ground truth database
+        is_fraud = tx["is_fraud"]
 
         labels.append(is_fraud)
 
@@ -133,7 +123,8 @@ def train_and_evaluate():
 
     # converting to scores
     # keep this in review - maybe needs change
-    iso_scores = -iso_forest.decision_function(X_test)  # higher = more suspicious
+    # higher = more suspicious
+    iso_scores = -iso_forest.decision_function(X_test)
 
     # PR-AUC
     precision_iso, recall_iso, _ = precision_recall_curve(y_test, iso_scores)
