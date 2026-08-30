@@ -167,6 +167,23 @@ def score_transaction(tx: TransactionIn):
         "shipping_geo": tx.shipping_geo,
     }
 
+    # this line saves the new transaction to the database first
+    # If we don't save it, the database will crash when we try to attach a flag to it later.
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO transactions (id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (id) DO NOTHING
+        """,
+        (tx.id, tx.user_id, tx.amount, tx.merchant_category,
+         tx_dict["timestamp"], tx.device_id, tx.ip_address, tx.billing_geo, tx.shipping_geo)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
     # 4 - score
     result = scorer.score(tx_dict, user, past_transactions)
 
@@ -238,7 +255,7 @@ def review_flag(flag_id: int, review: ReviewIn):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # check if flag exists and is not already reviewed
+    # checks if flag exists and is not already reviewed
     cursor.execute("SELECT id, outcome FROM flags WHERE id = %s", (flag_id,))
     flag = cursor.fetchone()
 
@@ -251,8 +268,9 @@ def review_flag(flag_id: int, review: ReviewIn):
     if flag[1] != "pending":
         cursor.close()
         conn.close()
+        readable_outcome = "Confirmed Fraud" if flag[1] == "true_positive" else "False_Positive"
         raise HTTPException(
-            status_code=400, detail=f"Flag {flag_id} has already been reviewed as '{flag[1]}'.")
+            status_code=400, detail=f"Flag {flag_id} has already been reviewed as '{readable_outcome}'.")
 
     # 3 update the flag
     cursor.execute(
