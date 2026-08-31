@@ -78,7 +78,7 @@ export function OverviewDashboard() {
   }
 
   if (error) {
-    return <div className="p-8 text-center text-rose-400"></div>;
+    return <div className="p-8 text-center text-rose-400">{error}</div>;
   }
 
   return (
@@ -87,7 +87,7 @@ export function OverviewDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-white">System Overview</h1>
         <p className="text-sm text-gray-400">
-          High-level metrics and decision volume acress all processed
+          High-level metrics and decision volume across all processed
           transactions.
         </p>
       </div>
@@ -95,7 +95,7 @@ export function OverviewDashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Flags */}
-        <div className="bg-card border border border p-5 rounded-xl space-y-2">
+        <div className="bg-card border border-border p-5 rounded-xl space-y-2">
           <div className="flex items-center justify-between text-gray-400">
             <span className="text-xs font-medium uppercase">Total Flags</span>
             <ShieldAlert className="w-4 h-4 text-indigo-400" />
@@ -112,7 +112,7 @@ export function OverviewDashboard() {
             </span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-2xl font-bol text-rose-400">{pendingCount}</p>
+          <p className="text-2xl font-bold text-rose-400">{pendingCount}</p>
           <p className="text-xs text-gray-500">Awaiting human analyst review</p>
         </div>
 

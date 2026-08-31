@@ -89,8 +89,10 @@ export function FlagsTable({ onSelectFlag }: FlagsTableProps) {
           <select
             value={filterOutcome}
             onChange={(e) => setFilterOutcome(e.target.value)}
-            className="bg-background border border-border text-xs text-white rounded-md
-              px-3 py-1.5 focus:outline-none focus:border-gray-500"
+            className="bg-card border border-border text-xs text-white rounded-md
+              px-3 py-1.5 focus:outline-none focus:border-gray-500 cursor-pointer
+              appearance-none"
+            style={{ colorScheme: 'dark' }}
           >
             <option value="">All Outcomes</option>
             <option value="pending">Pending Review</option>
@@ -102,8 +104,10 @@ export function FlagsTable({ onSelectFlag }: FlagsTableProps) {
           <select
             value={filterDecision}
             onChange={(e) => setFilterDecision(e.target.value)}
-            className="bg-background border border-border text-xs text-white rounded-md
-            px-d3 py-1.5 focus:outline-none focus:border-gray-500"
+            className="bg-card border border-border text-xs text-white rounded-md
+              px-3 py-1.5 focus:outline-none focus:border-gray-500 cursor-pointer
+              appearance-none"
+            style={{ colorScheme: 'dark' }}
           >
             <option value="">All Decisions</option>
             <option value="review">Needs Review</option>

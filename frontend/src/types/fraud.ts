@@ -13,7 +13,7 @@ export interface Flag {
     decision: string;
     top_features: FeatureExplanation[];
     outcome: string;
-    reviewd_by: string | null;
+    reviewed_by: string | null;
     created_at: string;
     reviewed_at: string | null;
 }
