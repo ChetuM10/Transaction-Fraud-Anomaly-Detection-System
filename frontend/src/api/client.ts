@@ -1,6 +1,6 @@
 import type { Flag, ReviewSubmission } from '../types/fraud';
 
-const API_BASE_URL = import.meta.env.PROD ? "" : "http://localhost:8000";
+const API_BASE_URL = import.meta.env.PROD ? window.location.origin : "http://localhost:8000";
 
 export async function fetchFlags(decision?: string, outcome?: string): Promise<Flag[]> {
     const url = new URL(`${API_BASE_URL}/flags`);
