@@ -138,18 +138,17 @@ Every transaction is converted into a 7-dimensional behavioral feature vector co
 6. **`is_odd_hour`**: Binary indicator (1 if the transaction happened late at night between 12 AM and 5 AM, else 0).
 7. **`category_diversity_1hr`**: Count of different merchant categories the user purchased from in the last hour.
 
-
 ---
 
 ## 5. API Endpoints (`api/routes.py`)
 
-| Method | Endpoint             | Description                                                                                                                       |
-| ------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/score`             | Ingests transaction JSON, queries user history, builds features, runs XGBoost + SHAP, and saves flag to DB.                       |
-| `GET`  | `/flags`             | Fetches scored transactions with optional filters (`?decision=auto_block&outcome=pending`).                                       |
-| `POST` | `/flags/{id}/review` | Submits human analyst verdict (`true_positive` / `false_positive`), records timestamp and reviewer name. Prevents double-reviews. |
-| `GET`  | `/model-versions`    | Lists all trained model iterations, training dates, metrics (PR-AUC), and artifact paths.                                         |
-| `GET`  | `/health`            | Health check verifying database connectivity and model memory allocation.                                                         |
+| Method | Endpoint                  | Description                                                                                                                       |
+| ------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/score`                  | Ingests transaction JSON, queries user history, builds features, runs XGBoost + SHAP, and saves flag to DB.                       |
+| `GET`  | `/flags`                  | Fetches scored transactions with optional filters (`?decision=auto_block&outcome=pending`).                                       |
+| `POST` | `/flags/{flag_id}/review` | Submits human analyst verdict (`true_positive` / `false_positive`), records timestamp and reviewer name. Prevents double-reviews. |
+| `GET`  | `/model-versions`         | Lists all trained model iterations, training dates, metrics (PR-AUC), and artifact paths.                                         |
+| `GET`  | `/health`                 | Health check verifying database connectivity and model memory allocation.                                                         |
 
 ---
 

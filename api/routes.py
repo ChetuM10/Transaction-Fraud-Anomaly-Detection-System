@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
+import os
 
 from db.connection import get_connection
 from models.scorer import FraudScorer
@@ -18,7 +21,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -295,7 +298,7 @@ def review_flag(flag_id: int, review: ReviewIn):
     }
 
 
-@app.get("/model_versions")
+@app.get("/model-versions")
 def list_model_versions():
     conn = get_connection()
     cursor = conn.cursor()
@@ -317,6 +320,24 @@ def list_model_versions():
     return rows
 
 
+@app.post("/reload-model")
+def reload_model():
+    # Loads the newly trained model without restarting the API.
+    global scorer
+    scorer = FraudScorer()
+    return {"status": "reloaded", "model_loaded": scorer.model is not None}
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "model_loaded": scorer.model is not None}
+
+# ---------------- FRONTEND DASHBOARD ----------------#
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+if os.path.exists(frontend_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
+    
+    @app.get("/")
+    def serve_react_app():
+        return FileResponse(os.path.join(frontend_path, "index.html"))
