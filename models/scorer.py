@@ -39,8 +39,12 @@ class FraudScorer:
         feature_array = np.array([[features[f] for f in FEATURE_NAMES]])
 
         # second - get fraud probability (0.0 - 1.0)
-        fraud_prob = float(self.model.predict_proba(feature_array)[0, 1])
-
+        if hasattr(self.model, "predict_proba"):
+            fraud_prob = float(self.model.predict_proba(feature_array)[0, 1])
+        else:
+            # IsolationForest calculates anamoly score, then we covert it to 0-1
+            raw = -self.model.decision_function(feature_array)[0]
+            fraud_prob = float(np.clip((raw + 0.5) / 1.0, 0.0, 1.0))
         # third - apply threshold-based decision
         if fraud_prob < THRESHOLD_AUTO_APPROVE:
             decision = "auto_approve"
