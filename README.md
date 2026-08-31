@@ -130,13 +130,14 @@ The diagram below illustrates how each file in the codebase communicates across 
 
 Every transaction is converted into a 7-dimensional behavioral feature vector computed against that user's historical baseline:
 
-1. **`amount_zscore`**: Number of standard deviations the transaction amount deviates from the user's historical spend average ($Z = \frac{x - \mu}{\sigma}$).
-2. **`is_new_device`**: Binary indicator (1 if current `device_id` is not present in user's `known_devices` list, else 0).
-3. **`is_geo_mismatch`**: Binary indicator (1 if `shipping_geo` differs from user's primary `home_geo`, else 0).
-4. **`hour_deviation`**: Angular/cyclical deviation of transaction hour from user's normal active hours.
-5. **`velocity_1hr`**: Number of transactions attempted by the user in the past 60 minutes.
-6. **`velocity_24hr`**: Number of transactions attempted by the user in the past 24 hours.
-7. **`category_diversity_1hr`**: Count of distinct merchant categories accessed in the last 1 hour (detects rapid automated card testing).
+1. **`amount_zscore`**: How many standard deviations the transaction amount deviates from the user's historical spend average.
+2. **`is_new_device`**: Binary indicator (1 if the device has never been used by this user before, else 0).
+3. **`is_geo_mismatch`**: Binary indicator (1 if the shipping location differs from the user's home location, else 0).
+4. **`hour_deviation`**: How far the transaction time deviates from the user's normal active hours.
+5. **`velocity_10min`**: How many transactions this user attempted in just the last 10 minutes (detects rapid card testing).
+6. **`is_odd_hour`**: Binary indicator (1 if the transaction happened late at night between 12 AM and 5 AM, else 0).
+7. **`category_diversity_1hr`**: Count of different merchant categories the user purchased from in the last hour.
+
 
 ---
 
