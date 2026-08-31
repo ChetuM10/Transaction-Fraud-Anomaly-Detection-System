@@ -4,6 +4,7 @@
 import os
 
 import psycopg2
+from psycopg2 import pool
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,16 +34,21 @@ def init_pool():
         )
 
 
+class PoolWrapper:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __getattr__(self, name):
+        # Pass normal commands (like .cursor()) straight to the real connection
+        return getattr(self._conn, name)
+
+    def close(self):
+        # Intercept .close() and safely put the connection back in the pool
+        db_pool.putconn(self._conn)
+
+
 def get_connection():
     if not db_pool:
         init_pool()
-
-    conn = db_pool.getconn()
-
-    # Clever trick: when routes.py calls conn.close(),
-    # put it back in the pool instead of actually closing the TCP socket!
-    def pool_close():
-        db_pool.putconn(conn)
-
-    conn.close = pool_close
-    return conn
+    # Wrap the connection before returning it so .close() behaves safely
+    return PoolWrapper(db_pool.getconn())
