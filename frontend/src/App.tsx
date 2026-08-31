@@ -16,7 +16,7 @@ export default function App() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* main content */}
-      <div className="flex-1 p-8 overflow-auto">
+      <div className="flex-1 p-4 md:p-8 overflow-auto">
         {/* simple paceholder for now */}
         {activeTab === "overview" && <OverviewDashboard />}
 
