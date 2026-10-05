@@ -1,5 +1,4 @@
-/*         Tables: users, transactions         */
--- users table stpres each user's profile
+-- users table
 CREATE TABLE if NOT EXISTS users (
     id VARCHAR(50) PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -7,7 +6,7 @@ CREATE TABLE if NOT EXISTS users (
     home_geo VARCHAR(50),
     known_devices TEXT [] DEFAULT '{}'
 );
--- Transactions table: log for every transaction
+-- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
     id VARCHAR(50) PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL REFERENCES users (id),
