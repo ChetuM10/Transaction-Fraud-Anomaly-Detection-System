@@ -24,13 +24,16 @@ FEATURE_NAMES = [
 class FraudScorer:
     """First loads svaed model, then scores transactions"""
 
-    def __init__(self):
-        model_path = os.path.join(
-            os.path.dirname(__file__), "saved_models", "best_model.joblib"
-        )
+    def __init__(self, model_path: str | None = None, version_id: int | None = None):
+        if model_path is None:
+            model_path = os.path.join(
+                os.path.dirname(__file__), "saved_models", "best_model.joblib"
+            )
+        self.model_path = model_path
+        self.version_id = version_id
         self.model = joblib.load(model_path)
         self.explainer = shap.TreeExplainer(self.model)
-        print("FraudScorer loaded Successfully.")
+        print(f"FraudScorer loaded Successfully from {model_path}.")
 
     def score(self, transaction, user, past_transactions):
 
@@ -45,6 +48,7 @@ class FraudScorer:
             # IsolationForest calculates anamoly score, then we covert it to 0-1
             raw = -self.model.decision_function(feature_array)[0]
             fraud_prob = float(np.clip((raw + 0.5) / 1.0, 0.0, 1.0))
+            
         # third - apply threshold-based decision
         if fraud_prob < THRESHOLD_AUTO_APPROVE:
             decision = "auto_approve"
