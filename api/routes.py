@@ -14,7 +14,7 @@ load_dotenv()
 
 app = FastAPI(
     title="Fraud Detection API",
-    description="Scrores transactions against user behavioral baselines.",
+    description="Scorers transactions against user behavioral baselines.",
     version="0.1.0",
 )
 
@@ -328,9 +328,61 @@ def reload_model():
     return {"status": "reloaded", "model_loaded": scorer.model is not None}
 
 
+@app.post("/models/{version_id}/rollback")
+def rollback_model(version_id: int):
+    """
+    Rolls back the active in-memory FraudScorer to an earlier trained model version
+    recorded in the model_versions audit table.
+    """
+    global scorer
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, model_path, metrics, trained_at
+        FROM model_versions
+        WHERE id = %s
+        """,
+        (version_id,),
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model version #{version_id} not found in audit table.",
+        )
+
+    version_id_val, model_path, metrics, trained_at = row
+
+    if not os.path.exists(model_path):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model artifact file does not exist at path: {model_path}",
+        )
+
+    # Swap in-memory model and explainer
+    scorer = FraudScorer(model_path=model_path, version_id=version_id_val)
+
+    return {
+        "status": "rolled_back",
+        "active_version_id": version_id_val,
+        "model_path": model_path,
+        "metrics": metrics,
+        "trained_at": str(trained_at),
+    }
+
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "model_loaded": scorer.model is not None}
+    return {
+        "status": "ok",
+        "model_loaded": scorer.model is not None,
+        "active_version_id": getattr(scorer, "version_id", None),
+        "active_model_path": getattr(scorer, "model_path", None),
+    }
 
 # ---------------- FRONTEND DASHBOARD ----------------#
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
