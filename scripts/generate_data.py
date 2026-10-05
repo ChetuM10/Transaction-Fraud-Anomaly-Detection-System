@@ -1,13 +1,19 @@
 # Generates users and transactions for testing (5% fraud transactions i've added)
 
+import os
+import sys
+
+# Ensures project root is on sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
-
 import numpy as np
 from faker import Faker
 
 from db.connection import get_connection
+
 
 fake = Faker("en_IN")
 
@@ -196,35 +202,148 @@ def generate_transactions(users, num_transactions, fraud_ratio):
 
 
 def insert_transactions(transactions):
-    # this inserts transactions that are generated into PostgreSQL
+    # this inserts transactions that are generated into PostgreSQL using fast batch execution
+    from psycopg2.extras import execute_values
     conn = get_connection()
     cursor = conn.cursor()
-    for t in transactions:
-        cursor.execute(
-            """
-            INSERT INTO transactions (
-            id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo, is_fraud
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id) DO NOTHING
-            """,
-            (
-                t["id"],
-                t["user_id"],
-                t["amount"],
-                t["merchant_category"],
-                t["timestamp"],
-                t["device_id"],
-                t["ip_address"],
-                t["billing_geo"],
-                t["shipping_geo"],
-                t["is_fraud"],
-            ),
+    values = [
+        (
+            t["id"],
+            t["user_id"],
+            t["amount"],
+            t["merchant_category"],
+            t["timestamp"],
+            t["device_id"],
+            t["ip_address"],
+            t["billing_geo"],
+            t["shipping_geo"],
+            t["is_fraud"],
         )
+        for t in transactions
+    ]
+    execute_values(
+        cursor,
+        """
+        INSERT INTO transactions (
+            id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo, is_fraud
+        )
+        VALUES %s
+        ON CONFLICT (id) DO NOTHING
+        """,
+        values,
+        page_size=1000,
+    )
     conn.commit()
     cursor.close()
     conn.close()
     print(f"Inserted {len(transactions)} transactions.")
+
+
+def seed_pending_flags(users, num_flags=12):
+    """
+    Scores fresh transactions using FraudScorer to populate the flags table
+    with real, unreviewed 'pending' flags across all 3 decision tiers.
+    """
+    try:
+        from models.scorer import FraudScorer
+        scorer = FraudScorer()
+    except Exception as e:
+        print(f"Could not load FraudScorer ({e}). Skipping flag seeding.")
+        return
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    seeded_count = 0
+
+    print(f"Scoring {num_flags} fresh transactions to seed Reviewer Queue...")
+
+    for i in range(num_flags):
+        user = random.choice(users)
+        tx_id = f"t_pending_{uuid.uuid4().hex[:8]}"
+
+        # Alternate scenarios so queue has a realistic mix of auto_block, review, and auto_approve
+        scenario = i % 3
+        if scenario == 0:  # High risk -> auto_block
+            amount = round(user["avg_transaction_amount"]
+                           * random.uniform(8.0, 15.0), 2)
+            device_id = f"device_unknown_{random.randint(9000, 9999)}"
+            shipping_geo = random.choice(
+                [c for c in CITIES if c != user["home_geo"]])
+        elif scenario == 1:  # Medium risk -> review
+            amount = round(user["avg_transaction_amount"]
+                           * random.uniform(2.5, 4.0), 2)
+            device_id = random.choice(user["known_devices"])
+            shipping_geo = random.choice(
+                [c for c in CITIES if c != user["home_geo"]])
+        else:  # Normal transaction
+            amount = round(max(10.0, np.random.normal(
+                user["avg_transaction_amount"], user["avg_transaction_amount"] * 0.2)), 2)
+            device_id = random.choice(user["known_devices"])
+            shipping_geo = user["home_geo"]
+
+        tx_time = now - timedelta(minutes=random.randint(2, 60))
+
+        # Insert transaction first
+        cursor.execute(
+            """
+            INSERT INTO transactions (id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo, is_fraud)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (
+                tx_id, user["id"], amount, random.choice(MERCHANT_CATEGORIES),
+                tx_time, device_id, fake.ipv4(
+                ), user["home_geo"], shipping_geo,
+                1 if scenario == 0 else 0
+            )
+        )
+
+        # Build tx dict for scorer
+        tx_dict = {
+            "id": tx_id,
+            "user_id": user["id"],
+            "amount": amount,
+            "merchant_category": random.choice(MERCHANT_CATEGORIES),
+            "timestamp": tx_time,
+            "device_id": device_id,
+            "ip_address": fake.ipv4(),
+            "billing_geo": user["home_geo"],
+            "shipping_geo": shipping_geo,
+        }
+
+        # Fetch past transactions for user
+        cursor.execute(
+            """
+            SELECT id, user_id, amount, merchant_category, timestamp, device_id, ip_address, billing_geo, shipping_geo
+            FROM transactions WHERE user_id = %s ORDER BY timestamp ASC
+            """,
+            (user["id"],)
+        )
+        col_names = ["id", "user_id", "amount", "merchant_category",
+                     "timestamp", "device_id", "ip_address", "billing_geo", "shipping_geo"]
+        past_txs = [dict(zip(col_names, r)) for r in cursor.fetchall()]
+
+        # Score transaction
+        result = scorer.score(tx_dict, user, past_txs)
+
+        # Save flag with outcome='pending'
+        import json
+        cursor.execute(
+            """
+            INSERT INTO flags (transaction_id, score, top_features, decision, outcome)
+            VALUES (%s, %s, %s, %s, 'pending')
+            """,
+            (tx_id, result["score"], json.dumps(
+                result["top_features"]), result["decision"])
+        )
+        seeded_count += 1
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(
+        f"Successfully seeded {seeded_count} live pending flags in Reviewer Queue.")
 
 
 if __name__ == "__main__":
@@ -234,4 +353,6 @@ if __name__ == "__main__":
 
     transactions = generate_transactions(users, NUM_TRANSACTIONS, FRAUD_RATIO)
     insert_transactions(transactions)
+
+    seed_pending_flags(users, num_flags=12)
     print("Data generation complete!")
