@@ -5,13 +5,19 @@ from datetime import timedelta
 import numpy as np
 
 
+def _normalize_dt(dt):
+    if dt is not None and getattr(dt, "tzinfo", None) is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
+
 # ----------------Feature:1 - Transaction Velocity-----------------#
 # This tracks - How many txs did this user make in the last N minutes?
 # If High velocity - then, possible card testing
 def compute_transaction_velocity(past_timestamp, current_timestamp, window_minutes=10):
-    window_start = current_timestamp - timedelta(minutes=window_minutes)
-    count = sum(1 for ts in past_timestamp if window_start <=
-                ts < current_timestamp)
+    current_ts = _normalize_dt(current_timestamp)
+    window_start = current_ts - timedelta(minutes=window_minutes)
+    count = sum(1 for ts in past_timestamp if window_start <= _normalize_dt(ts) < current_ts)
     return count
 
 
@@ -89,7 +95,6 @@ def build_feature_vector(transaction, user, past_transactions):
         past_transactions: list of this user's transaction BEFORE this one
     Returns:
     dict of feature_name -> numerical value
-
     """
 
     # Extract lists from past transactions
@@ -98,16 +103,17 @@ def build_feature_vector(transaction, user, past_transactions):
     past_hours = [t["timestamp"].hour for t in past_transactions]
 
     # Recent Categories
-    one_hour_ago = transaction["timestamp"] - timedelta(hours=1)
+    tx_time = _normalize_dt(transaction["timestamp"])
+    one_hour_ago = tx_time - timedelta(hours=1)
     recent_categories = [
         t["merchant_category"]
         for t in past_transactions
-        if t["timestamp"] >= one_hour_ago
+        if _normalize_dt(t["timestamp"]) >= one_hour_ago
     ]
 
     # compute all features
     velocity = compute_transaction_velocity(
-        past_timestamps, transaction["timestamp"])
+        past_timestamps, tx_time)
 
     amount_deviation = compute_amount_deviation(
         float(transaction["amount"]), past_amounts
@@ -121,7 +127,7 @@ def build_feature_vector(transaction, user, past_transactions):
     )
 
     is_odd_hour, hour_deviation = compute_time_anomaly(
-        transaction["timestamp"].hour, past_hours
+        tx_time.hour, past_hours
     )
 
     category_diversity = compute_category_diversity(recent_categories)
